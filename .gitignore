@@ -1,0 +1,7 @@
+
+venv/
+__pycache__/
+secret.txt
+personal.txt
+encrypted_files/
+decrypted_files/
