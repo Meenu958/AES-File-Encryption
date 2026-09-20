@@ -25,7 +25,7 @@ This project demonstrates practical concepts related to:
 - Separate folders for encrypted and decrypted files
 - Simple command-line interface
 - Error handling during encryption and decryption
-
+- Password strength checker
 ## Technologies Used
 
 - Python
