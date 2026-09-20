@@ -1,6 +1,12 @@
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
 import os
 import getpass
+
+
+# ---------------- PASSWORD STRENGTH ----------------
+
 def check_password_strength(password):
     score = 0
 
@@ -26,91 +32,171 @@ def check_password_strength(password):
     else:
         return "Strong"
 
-# AES encryption
-# AES encryption
+
+# ---------------- KEY DERIVATION ----------------
+
+def derive_key(password, salt):
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,              # 32 bytes = AES-256
+        salt=salt,
+        iterations=600000,
+    )
+
+    return kdf.derive(password.encode())
+
+
+# ---------------- ENCRYPTION ----------------
+
 def encrypt_file():
-    filename = input("Enter file name: ")
+    file_path = input("Enter file path to encrypt: ").strip()
 
-    if not os.path.exists(filename):
+    if not os.path.isfile(file_path):
         print("File not found!")
         return
 
     password = getpass.getpass("Enter password: ")
 
-    strength = check_password_strength(password)
+    print("Password strength:", check_password_strength(password))
 
-    print("Password strength:", strength)
-
-    if strength == "Weak":
-        print("Password is too weak. Please use a stronger password.")
+    if len(password) < 8:
+        print("Password must contain at least 8 characters!")
         return
 
-    # Create a 32-byte AES key from the password
-    key = password.ljust(32, "0").encode()[:32]
+    try:
+        with open(file_path, "rb") as file:
+            data = file.read()
 
-    # Create a random IV
-    iv = os.urandom(16)
+        # Generate random salt
+        salt = os.urandom(16)
 
-# AES decryption
+        # Generate AES-256 key
+        key = derive_key(password, salt)
+
+        # Generate random nonce
+        nonce = os.urandom(12)
+
+        # AES-256-GCM encryption
+        aesgcm = AESGCM(key)
+        encrypted_data = aesgcm.encrypt(nonce, data, None)
+
+        # Create output folder
+        os.makedirs("encrypted_files", exist_ok=True)
+
+        filename = os.path.basename(file_path)
+        output_path = os.path.join(
+            "encrypted_files",
+            filename + ".encrypted"
+        )
+
+        # Store:
+        # salt + nonce + encrypted data
+        with open(output_path, "wb") as file:
+            file.write(salt)
+            file.write(nonce)
+            file.write(encrypted_data)
+
+        print("\nFile encrypted successfully!")
+        print("Saved to:", output_path)
+
+    except Exception as e:
+        print("Encryption failed:", e)
+
+
+# ---------------- DECRYPTION ----------------
+
 def decrypt_file():
-    filename = input("Enter encrypted file name: ")
+    file_path = input("Enter encrypted file path: ").strip()
 
-    if not os.path.exists(filename):
-        print("File not found!")
+    if not os.path.isfile(file_path):
+        print("Encrypted file not found!")
         return
 
     password = getpass.getpass("Enter password: ")
 
-    key = password.ljust(32, "0").encode()[:32]
+    try:
+        with open(file_path, "rb") as file:
+            encrypted_file = file.read()
 
-    # Read encrypted file
-    with open(filename, "rb") as file:
-        data = file.read()
+        # Check minimum size
+        if len(encrypted_file) < 28:
+            print("Invalid encrypted file!")
+            return
 
-    # Get IV
-    iv = data[:16]
+        # Extract salt
+        salt = encrypted_file[:16]
 
-    # Get encrypted data
-    encrypted_data = data[16:]
+        # Extract nonce
+        nonce = encrypted_file[16:28]
 
-    # Create AES cipher
-    cipher = Cipher(algorithms.AES(key), modes.CFB(iv))
-    decryptor = cipher.decryptor()
+        # Extract encrypted data
+        encrypted_data = encrypted_file[28:]
 
-    # Decrypt
-    decrypted_data = decryptor.update(encrypted_data) + decryptor.finalize()
+        # Derive the same AES-256 key
+        key = derive_key(password, salt)
 
-    # Create output filename
-    original_name = os.path.basename(filename).replace(".encrypted", "")
-    output = "decrypted_files/" + original_name
+        # AES-256-GCM decryption
+        aesgcm = AESGCM(key)
 
-    # Save decrypted file
-    with open(output, "wb") as file:
-        file.write(decrypted_data)
+        try:
+            decrypted_data = aesgcm.decrypt(
+                nonce,
+                encrypted_data,
+                None
+            )
+        except Exception:
+            print("\nInvalid password or corrupted encrypted file!")
+            return
 
-    print("File decrypted successfully!")
-    print("Saved as:", output)
+        # Create output folder
+        os.makedirs("decrypted_files", exist_ok=True)
+
+        filename = os.path.basename(file_path)
+
+        if filename.endswith(".encrypted"):
+            filename = filename[:-10]
+
+        output_path = os.path.join(
+            "decrypted_files",
+            filename
+        )
+
+        with open(output_path, "wb") as file:
+            file.write(decrypted_data)
+
+        print("\nFile decrypted successfully!")
+        print("Saved to:", output_path)
+
+    except Exception as e:
+        print("Decryption failed:", e)
 
 
-# Main menu
-while True:
+# ---------------- MAIN MENU ----------------
 
-    print("\n===== AES FILE ENCRYPTION TOOL =====")
-    print("1. Encrypt file")
-    print("2. Decrypt file")
-    print("3. Exit")
+def main():
+    while True:
+        print("\n==============================")
+        print(" AES FILE ENCRYPTION TOOL")
+        print("==============================")
+        print("1. Encrypt File")
+        print("2. Decrypt File")
+        print("3. Exit")
 
-    choice = input("Enter your choice: ")
+        choice = input("Enter your choice: ").strip()
 
-    if choice == "1":
-        encrypt_file()
+        if choice == "1":
+            encrypt_file()
 
-    elif choice == "2":
-        decrypt_file()
+        elif choice == "2":
+            decrypt_file()
 
-    elif choice == "3":
-        print("Program closed.")
-        break
+        elif choice == "3":
+            print("Exiting...")
+            break
 
-    else:
-        print("Invalid choice!")
+        else:
+            print("Invalid choice!")
+
+
+if __name__ == "__main__":
+    main()
