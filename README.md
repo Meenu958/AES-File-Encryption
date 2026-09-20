@@ -46,3 +46,12 @@ AES-File-Encryption/
 ├── test_files/
 ├── requirements.txt
 └── README.md
+
+
+## Contributors
+
+- **Meenu Ojha** — Developer  
+  Email: ojha.meenu598@gmail.com
+
+- **Pranali Ekbote** — Project Documentation & Synopsis
+  Email: pranaliekbote55@gmail.com
