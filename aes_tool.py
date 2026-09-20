@@ -1,8 +1,32 @@
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 import os
 import getpass
+def check_password_strength(password):
+    score = 0
 
+    if len(password) >= 8:
+        score += 1
 
+    if any(c.isupper() for c in password):
+        score += 1
+
+    if any(c.islower() for c in password):
+        score += 1
+
+    if any(c.isdigit() for c in password):
+        score += 1
+
+    if any(not c.isalnum() for c in password):
+        score += 1
+
+    if score <= 2:
+        return "Weak"
+    elif score <= 4:
+        return "Medium"
+    else:
+        return "Strong"
+
+# AES encryption
 # AES encryption
 def encrypt_file():
     filename = input("Enter file name: ")
@@ -13,32 +37,19 @@ def encrypt_file():
 
     password = getpass.getpass("Enter password: ")
 
+    strength = check_password_strength(password)
+
+    print("Password strength:", strength)
+
+    if strength == "Weak":
+        print("Password is too weak. Please use a stronger password.")
+        return
+
     # Create a 32-byte AES key from the password
     key = password.ljust(32, "0").encode()[:32]
 
     # Create a random IV
     iv = os.urandom(16)
-
-    # Create AES cipher
-    cipher = Cipher(algorithms.AES(key), modes.CFB(iv))
-    encryptor = cipher.encryptor()
-
-    # Read the file
-    with open(filename, "rb") as file:
-        data = file.read()
-
-    # Encrypt the data
-    encrypted_data = encryptor.update(data) + encryptor.finalize()
-
-    # Save encrypted file
-    output = "encrypted_files/" + os.path.basename(filename) + ".encrypted"
-
-    with open(output, "wb") as file:
-        file.write(iv + encrypted_data)
-
-    print("File encrypted successfully!")
-    print("Saved as:", output)
-
 
 # AES decryption
 def decrypt_file():
